@@ -85,6 +85,35 @@ try:
 except (FileNotFoundError, PermissionError, OSError):
     print("Error opening file")
     
+######
+# query to show most common month of birth for each county in N. Ireland in json 
+try:
+    with open('/data/county_common_birthmonth.json', 'w') as json_file:
+        mysql_query = ('SELECT County, BirthMonth '
+                        'FROM ( '
+                        'SELECT pl.county AS County '
+                            ', MONTHNAME(pe.date_of_birth) BirthMonth '
+                            ', COUNT(pe.date_of_birth) PersonCount '
+                            ', ROW_NUMBER() OVER(PARTITION BY County ORDER BY COUNT(pe.date_of_birth) DESC) RowNum '
+                        'FROM Person pe '
+                        'INNER JOIN Place pl ON pe.place_of_birth = pl.city '
+                        'WHERE pl.country = \'Northern Ireland\' '
+                        'GROUP BY pl.county, MONTHNAME(pe.date_of_birth) '
+                        ') base '
+                        'WHERE base.RowNum = 1;'
+                        )  
+        try:                                
+            rows = connection.execute(text(mysql_query))
+            row_list = list(rows)
+
+            rows = [{row[0]: row[1] for row in row_list}]
+            
+            json.dump(rows[0], json_file, separators=(',', ':'))
+        except SQLAlchemyError as e:
+            error = str(e.__dict__['orig'])
+            print(error)
+except (FileNotFoundError, PermissionError, OSError):
+    print("Error opening file")
 
 connection.close()
 engine.dispose()
